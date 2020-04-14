@@ -77,10 +77,11 @@ unsigned long timeold;
 void magnet_detect_forward();
 
 unsigned long lastHallSend;
-unsigned int rpm;
-bool direction;
-bool lastDirection;
-const long HOLD_MILLIS = 40;
+volatile unsigned int rpm;
+volatile bool direction;
+volatile bool lastDirection;
+
+// const long HOLD_MILLIS = 40;
 const bool forward = true;
 const bool backward = false;
 
@@ -274,42 +275,42 @@ void mpu_loop() {
             pitch = (ypr[1] * 180/M_PI);
             roll = (ypr[2] * 180/M_PI);
 
-            // Serial.print("ypr\t");
-            // Serial.print(yaw);
-            // Serial.print("\t");
-            // Serial.print(pitch);
-            // Serial.print("\t");
-            // Serial.println(roll);
-            //
-            // if (roll <= -11) {
-            //   Serial.print("LEFT\t");
-            //   leftStatus = true;
-            // }else{
-            //   Serial.print("---\t");
-            //   leftStatus = false;
-            // }
-            //
-            // if (roll > -11 && roll < 11) {
-            //   Serial.print("CENTER\t");
-            // }else{
-            //   Serial.print("---\t");
-            // }
-            //
-            // if (roll >= 18) {
-            //   Serial.print("RIGHT\t");
-            //   rightStatus = true;
-            // }else{
-            //   Serial.print("---\t");
-            //   rightStatus = false;
-            // }
-            //
-            // if (pitch > 42) {
-            //   Serial.print("FIRE\t");
-            //   fireStatus = true;
-            // }else{
-            //   Serial.print("---\t");
-            //   fireStatus = false;
-            // }
+            Serial.print("ypr\t");
+            Serial.print(yaw);
+            Serial.print("\t");
+            Serial.print(pitch);
+            Serial.print("\t");
+            Serial.println(roll);
+
+            if (roll <= -11) {
+              Serial.print("LEFT\t");
+              leftStatus = true;
+            }else{
+              Serial.print("---\t");
+              leftStatus = false;
+            }
+
+            if (roll > -11 && roll < 11) {
+              Serial.print("CENTER\t");
+            }else{
+              Serial.print("---\t");
+            }
+
+            if (roll >= 18) {
+              Serial.print("RIGHT\t");
+              rightStatus = true;
+            }else{
+              Serial.print("---\t");
+              rightStatus = false;
+            }
+
+            if (pitch > 42) {
+              Serial.print("FIRE\t");
+              fireStatus = true;
+            }else{
+              Serial.print("---\t");
+              fireStatus = false;
+            }
          #endif
 
 
@@ -399,7 +400,7 @@ void magnet_detect_forward()//This function is called whenever a magnet/interrup
   if(digitalRead(backMagnetPin) == HIGH){
     direction = forward;
   }else{
-    direction = backward;  
+    direction = backward;
   }
 
   if(direction != lastDirection){
@@ -407,12 +408,10 @@ void magnet_detect_forward()//This function is called whenever a magnet/interrup
     magnetHits = 1;
   }else{
     magnetHits++;
-    rpm = 60L*1000L/((millis() - timeold));
-    rpm = (rpm > 400) ? 0 : rpm;
+    rpm = 60000L/((millis() - timeold));
   }
 
   timeold = millis();
   lastDirection = direction;
-
 
 }
