@@ -66,14 +66,12 @@ const int forwardMagnetPin = 7;
 #define GYRO_INTERRUPT_PIN 0
 const int buttonPin = 16;
 
-volatile byte revolutions_back;
-// volatile byte revolutions_back_last;
-volatile byte revolutions_forward;
-// volatile byte revolutions_forward_last;
+volatile byte magnetHits;
 
-// unsigned long timeold;
-unsigned long timeold_back;
-unsigned long timeold_forward;
+
+unsigned long timeold;
+// unsigned long timeold_back;
+// unsigned long timeold_forward;
 
 // void magnet_detect_back();
 void magnet_detect_forward();
@@ -81,6 +79,7 @@ void magnet_detect_forward();
 unsigned long lastHallSend;
 unsigned int rpm;
 bool direction;
+bool lastDirection;
 const long HOLD_MILLIS = 40;
 const bool forward = true;
 const bool backward = false;
@@ -141,10 +140,10 @@ void dmpDataReady() {
 void setup() {
 
   rpm = 0;
-  revolutions_back = 0;
-  revolutions_forward = 0;
+  magnetHits = 0;
   // timeold = 0;
   direction = forward;
+  lastDirection = backward;
 
   pinMode(buttonPin, INPUT_PULLUP);
   pinMode(backMagnetPin, INPUT_PULLUP);
@@ -329,14 +328,12 @@ void hall_loop(){
     if(direction == forward){
       Serial.print(millis());
       Serial.print(" ");
-      Serial.print(timeold_forward);
+      Serial.print(timeold);
       Serial.print(" ");
       Serial.print("FORWARDS:");
       Serial.print(rpm);
-      Serial.print("\tB:\t");
-      Serial.print(revolutions_back);
-      Serial.print("F:\t");
-      Serial.print(revolutions_forward);
+      Serial.print("\thits:\t");
+      Serial.print(magnetHits);
       if(digitalRead(backMagnetPin) == HIGH){Serial.print("\tBACK:HIGH");}else{Serial.print("\tBACK:LOW");}
       if(digitalRead(forwardMagnetPin) == HIGH){Serial.println("\tFWD:HIGH");}else{Serial.println("\tFWD:LOW");}
 
@@ -355,14 +352,12 @@ void hall_loop(){
     if(direction == backward){
       Serial.print(millis());
       Serial.print(" ");
-      Serial.print(timeold_back);
+      Serial.print(timeold);
       Serial.print(" ");
       Serial.print("BACKWARDS:");
       Serial.print(rpm);
-      Serial.print("\tB:\t");
-      Serial.print(revolutions_back);
-      Serial.print("F:\t");
-      Serial.print(revolutions_forward);
+      Serial.print("\thits:\t");
+      Serial.print(magnetHits);
       if(digitalRead(backMagnetPin) == HIGH){Serial.print("\tBACK:HIGH");}else{Serial.print("\tBACK:LOW");}
       if(digitalRead(forwardMagnetPin) == HIGH){Serial.println("\tFWD:HIGH");}else{Serial.println("\tFWD:LOW");}
 
@@ -380,7 +375,7 @@ void hall_loop(){
 
   }
 
-  if(millis() - lastHallSend > 3000){ //timeout if no pedalling. TODO - Make this more granular
+  if(millis() - (timeold) > 3000){ //timeout if no pedalling. TODO - Make this more granular
     rpm = 0;
   }
 
@@ -403,30 +398,21 @@ void magnet_detect_forward()//This function is called whenever a magnet/interrup
 {
   if(digitalRead(backMagnetPin) == HIGH){
     direction = forward;
-    revolutions_forward++;
-    revolutions_back = 0;
-    timeold_forward = (timeold_forward == 0) ? millis() : timeold_forward;
-    // divide millis() - timeold_forward by 4 for new magnet arrangement with 1 per 90 degrees
-    rpm = 60L*1000L/((millis() - timeold_forward));
-    rpm = (rpm > 400) ? 0 : rpm;
-
-    timeold_forward = millis();
   }else{
-    direction = backward;
-    revolutions_back++;
-    revolutions_forward = 0;
-    timeold_back = (timeold_back == 0) ? millis() : timeold_back;
-    rpm = 60L*1000L/((millis() - timeold_back));
-    rpm = (rpm > 400) ? 0 : rpm;
-    timeold_back = millis();
-    timeold_forward = 0;
+    direction = backward;  
   }
+
+  if(direction != lastDirection){
+    rpm = 0;
+    magnetHits = 1;
+  }else{
+    magnetHits++;
+    rpm = 60L*1000L/((millis() - timeold));
+    rpm = (rpm > 400) ? 0 : rpm;
+  }
+
+  timeold = millis();
+  lastDirection = direction;
 
 
 }
-//
-// void magnet_detect_forward()//This function is called whenever a magnet/interrupt is detected by the arduino
-// {
-//   revolutions_forward++;
-//   timeold_forward = millis();
-// }
