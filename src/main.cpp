@@ -408,6 +408,7 @@ void magnet_detect_forward()//This function is called whenever a magnet/interrup
     timeold_forward = (timeold_forward == 0) ? millis() : timeold_forward;
     // divide millis() - timeold_forward by 4 for new magnet arrangement with 1 per 90 degrees
     rpm = 60L*1000L/((millis() - timeold_forward));
+    rpm = (rpm > 400) ? 0 : rpm;
 
     timeold_forward = millis();
   }else{
@@ -416,7 +417,7 @@ void magnet_detect_forward()//This function is called whenever a magnet/interrup
     revolutions_forward = 0;
     timeold_back = (timeold_back == 0) ? millis() : timeold_back;
     rpm = 60L*1000L/((millis() - timeold_back));
-
+    rpm = (rpm > 400) ? 0 : rpm;
     timeold_back = millis();
     timeold_forward = 0;
   }
