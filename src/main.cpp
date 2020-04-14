@@ -44,12 +44,6 @@ MPU6050 mpu;
 #define OUTPUT_READABLE_YAWPITCHROLL
 
 
-
-
-#define INTERRUPT_PIN 0  // use pin 2 on Arduino Uno & most boards
-#define LED_PIN 13 // (Arduino is 13, Teensy is 11, Teensy++ is 6)
-bool blinkState = false;
-
 // MPU control/status vars
 bool dmpReady = false;  // set true if DMP init was successful
 uint8_t mpuIntStatus;   // holds actual interrupt status byte from MPU
@@ -67,24 +61,24 @@ float yaw;
 float pitch;
 float roll;
 
-const int backMagnetPin = 18;  // Used to monitor which buttons to press.
-const int forwardMagnetPin = 19;
-#define INTERRUPT_PIN 0
+const int backMagnetPin = 1;  // Used to monitor which buttons to press.
+const int forwardMagnetPin = 7;
+#define GYRO_INTERRUPT_PIN 0
 const int buttonPin = 16;
 
 volatile byte revolutions_back;
-volatile byte revolutions_back_last;
+// volatile byte revolutions_back_last;
 volatile byte revolutions_forward;
-volatile byte revolutions_forward_last;
+// volatile byte revolutions_forward_last;
 
-unsigned long timeold;
+// unsigned long timeold;
 unsigned long timeold_back;
 unsigned long timeold_forward;
 
-void magnet_detect_back();
+// void magnet_detect_back();
 void magnet_detect_forward();
 
-unsigned int lastDetect;
+unsigned long lastHallSend;
 unsigned int rpm;
 bool direction;
 const long HOLD_MILLIS = 40;
@@ -149,14 +143,14 @@ void setup() {
   rpm = 0;
   revolutions_back = 0;
   revolutions_forward = 0;
-  timeold = 0;
+  // timeold = 0;
   direction = forward;
 
   pinMode(buttonPin, INPUT_PULLUP);
-  pinMode(backMagnetPin, INPUT);
-  pinMode(forwardMagnetPin, INPUT);
+  pinMode(backMagnetPin, INPUT_PULLUP);
+  pinMode(forwardMagnetPin, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(backMagnetPin), magnet_detect_back, RISING);//Initialize the interrupt pin (Arduino digital pin 2)
+  // attachInterrupt(digitalPinToInterrupt(backMagnetPin), magnet_detect_back, RISING);//Initialize the interrupt pin (Arduino digital pin 2)
   attachInterrupt(digitalPinToInterrupt(forwardMagnetPin), magnet_detect_forward, RISING);//Initialize the interrupt pin (Arduino digital pin 2)
 
   forwardLastSent = 0;
@@ -202,7 +196,7 @@ void setup() {
     // initialize device
     Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
-    pinMode(INTERRUPT_PIN, INPUT);
+    pinMode(GYRO_INTERRUPT_PIN, INPUT);
 
     // verify connection
     Serial.println(F("Testing device connections..."));
@@ -236,9 +230,9 @@ void setup() {
 
         // enable Arduino interrupt detection
         Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
-        Serial.print(digitalPinToInterrupt(INTERRUPT_PIN));
+        Serial.print(digitalPinToInterrupt(GYRO_INTERRUPT_PIN));
         Serial.println(F(")..."));
-        attachInterrupt(digitalPinToInterrupt(INTERRUPT_PIN), dmpDataReady, RISING);
+        attachInterrupt(digitalPinToInterrupt(GYRO_INTERRUPT_PIN), dmpDataReady, RISING);
         mpuIntStatus = mpu.getIntStatus();
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -257,9 +251,7 @@ void setup() {
         Serial.println(F(")"));
     }
 
-    // configure LED for output
-    pinMode(LED_PIN, OUTPUT);
-    debounce = 250;
+    debounce = 1000;
 }
 
 
@@ -283,42 +275,42 @@ void mpu_loop() {
             pitch = (ypr[1] * 180/M_PI);
             roll = (ypr[2] * 180/M_PI);
 
-            Serial.print("ypr\t");
-            Serial.print(yaw);
-            Serial.print("\t");
-            Serial.print(pitch);
-            Serial.print("\t");
-            Serial.println(roll);
-
-            if (roll <= -11) {
-              Serial.print("LEFT\t");
-              leftStatus = true;
-            }else{
-              Serial.print("---\t");
-              leftStatus = false;
-            }
-
-            if (roll > -11 && roll < 11) {
-              Serial.print("CENTER\t");
-            }else{
-              Serial.print("---\t");
-            }
-
-            if (roll >= 18) {
-              Serial.print("RIGHT\t");
-              rightStatus = true;
-            }else{
-              Serial.print("---\t");
-              rightStatus = false;
-            }
-
-            if (pitch > 42) {
-              Serial.print("FIRE\t");
-              fireStatus = true;
-            }else{
-              Serial.print("---\t");
-              fireStatus = false;
-            }
+            // Serial.print("ypr\t");
+            // Serial.print(yaw);
+            // Serial.print("\t");
+            // Serial.print(pitch);
+            // Serial.print("\t");
+            // Serial.println(roll);
+            //
+            // if (roll <= -11) {
+            //   Serial.print("LEFT\t");
+            //   leftStatus = true;
+            // }else{
+            //   Serial.print("---\t");
+            //   leftStatus = false;
+            // }
+            //
+            // if (roll > -11 && roll < 11) {
+            //   Serial.print("CENTER\t");
+            // }else{
+            //   Serial.print("---\t");
+            // }
+            //
+            // if (roll >= 18) {
+            //   Serial.print("RIGHT\t");
+            //   rightStatus = true;
+            // }else{
+            //   Serial.print("---\t");
+            //   rightStatus = false;
+            // }
+            //
+            // if (pitch > 42) {
+            //   Serial.print("FIRE\t");
+            //   fireStatus = true;
+            // }else{
+            //   Serial.print("---\t");
+            //   fireStatus = false;
+            // }
          #endif
 
 
@@ -332,72 +324,63 @@ void mpu_loop() {
 
 void hall_loop(){
 
-  if (revolutions_back > revolutions_back_last && revolutions_back > 0) {
-
-      // divide millis() - timeold_back by 4 for new magnet arrangement with 1 per 90 degrees
-     rpm = 60L*1000L/((millis() - timeold_back) / 4);
-
-     if((millis() - lastDetect) > HOLD_MILLIS && direction == forward){ //If it didn't just see a magnet, this is the leading magnet. Go backwards.
-       direction = backward;
-       rpm = 0;
-     }
-
-     lastDetect = millis();
-     timeold_back = millis();
-     revolutions_back_last = revolutions_back;
-  }
-
-  if (revolutions_forward > revolutions_forward_last && revolutions_forward > 0) { //read on every rev.
-
-    // divide millis() - timeold_back by 4 for new magnet arrangement with 1 per 90 degrees
-    rpm = 60L*1000L/((millis() - timeold_forward) / 4);
-
-    if((millis() - lastDetect) > HOLD_MILLIS && direction == backward){ //If it didn't just see a magnet, this is the leading magnet. Go forwards.
-      direction = forward;
-      rpm = 0;
-    }
-
-    lastDetect = millis();
-    timeold_forward = millis();
-    revolutions_forward_last = revolutions_forward;
-
-  }
-
-  if(millis() - lastDetect > debounce){ //Change speed every quarter second
+  if(millis() - lastHallSend > debounce){ //Change speed every quarter second
 
     if(direction == forward){
-
+      Serial.print(millis());
+      Serial.print(" ");
+      Serial.print(timeold_forward);
+      Serial.print(" ");
+      Serial.print("FORWARDS:");
+      Serial.print(rpm);
+      Serial.print("\tB:\t");
+      Serial.print(revolutions_back);
+      Serial.print("F:\t");
+      Serial.print(revolutions_forward);
+      if(digitalRead(backMagnetPin) == HIGH){Serial.print("\tBACK:HIGH");}else{Serial.print("\tBACK:LOW");}
+      if(digitalRead(forwardMagnetPin) == HIGH){Serial.println("\tFWD:HIGH");}else{Serial.println("\tFWD:LOW");}
 
       if(rpm > 50){
-        Serial.print(">50\t");
         forwardStatus = true;
         nitroStatus = true;
       }else if(rpm > 35 && rpm < 50){
-        Serial.print(">35\t");
         forwardStatus = true;
         nitroStatus = false;
       }else{
-        //Serial.print("<35\t");
         forwardStatus = false;
         nitroStatus = false;
       }
     }
 
     if(direction == backward){
+      Serial.print(millis());
+      Serial.print(" ");
+      Serial.print(timeold_back);
+      Serial.print(" ");
+      Serial.print("BACKWARDS:");
+      Serial.print(rpm);
+      Serial.print("\tB:\t");
+      Serial.print(revolutions_back);
+      Serial.print("F:\t");
+      Serial.print(revolutions_forward);
+      if(digitalRead(backMagnetPin) == HIGH){Serial.print("\tBACK:HIGH");}else{Serial.print("\tBACK:LOW");}
+      if(digitalRead(forwardMagnetPin) == HIGH){Serial.println("\tFWD:HIGH");}else{Serial.println("\tFWD:LOW");}
+
       if(rpm > 35){
-        Serial.print("BACK\t");
+
         backwardStatus = true;
         nitroStatus = false;
       }else{
-        //Serial.print("BACK - STOPPED\t");
         backwardStatus = false;
         nitroStatus = false;
       }
     }
 
+    lastHallSend = millis();
+
   }
 
-  if(millis() - ((timeold_back + timeold_forward)/2) > 3000){ //timeout if no pedalling. TODO - Make this more granular
+  if(millis() - lastHallSend > 3000){ //timeout if no pedalling. TODO - Make this more granular
     rpm = 0;
   }
 
@@ -416,16 +399,33 @@ void loop(void)
 
 }
 
-void magnet_detect_back()//This function is called whenever a magnet/interrupt is detected by the arduino
-{
-  revolutions_back++;
-  timeold_back = millis();
-  Serial.println("BACK:\t"+revolutions_back);
-}
-
 void magnet_detect_forward()//This function is called whenever a magnet/interrupt is detected by the arduino
 {
-  revolutions_forward++;
-  timeold_forward = millis();
-  Serial.println("FORwARD:\t"+revolutions_forward);
+  if(digitalRead(backMagnetPin) == HIGH){
+    direction = forward;
+    revolutions_forward++;
+    revolutions_back = 0;
+    timeold_forward = (timeold_forward == 0) ? millis() : timeold_forward;
+    // divide millis() - timeold_forward by 4 for new magnet arrangement with 1 per 90 degrees
+    rpm = 60L*1000L/((millis() - timeold_forward));
+
+    timeold_forward = millis();
+  }else{
+    direction = backward;
+    revolutions_back++;
+    revolutions_forward = 0;
+    timeold_back = (timeold_back == 0) ? millis() : timeold_back;
+    rpm = 60L*1000L/((millis() - timeold_back));
+
+    timeold_back = millis();
+    timeold_forward = 0;
+  }
+
+
 }
+//
+// void magnet_detect_forward()//This function is called whenever a magnet/interrupt is detected by the arduino
+// {
+//   revolutions_forward++;
+//   timeold_forward = millis();
+// }
