@@ -61,10 +61,15 @@ float yaw;
 float pitch;
 float roll;
 
-const int backMagnetPin = 1;  // Used to monitor which buttons to press.
-const int forwardMagnetPin = 7;
-#define GYRO_INTERRUPT_PIN 0
-const int buttonPin = 16;
+const int backMagnetPin = 8;  // this is the 'slave' sensor on the pedals and not interruptable
+const int forwardMagnetPin = 7; // This is the interrupt pin
+const int gyroInterruptPin = 0;
+const int firstButtonPin = 16;
+const int secondButtonPin = 10;
+const int neoPixelPin = 14;
+
+const int hallIntPin = 1; //backup interruptable pin
+const int hallPin = 5; //not interruptable
 
 volatile byte magnetHits;
 
@@ -146,7 +151,8 @@ void setup() {
   direction = forward;
   lastDirection = backward;
 
-  pinMode(buttonPin, INPUT_PULLUP);
+  pinMode(firstButtonPin, INPUT_PULLUP);
+  pinMode(secondButtonPin, INPUT_PULLUP);
   pinMode(backMagnetPin, INPUT_PULLUP);
   pinMode(forwardMagnetPin, INPUT_PULLUP);
 
@@ -196,7 +202,7 @@ void setup() {
     // initialize device
     Serial.println(F("Initializing I2C devices..."));
     mpu.initialize();
-    pinMode(GYRO_INTERRUPT_PIN, INPUT);
+    pinMode(gyroInterruptPin, INPUT);
 
     // verify connection
     Serial.println(F("Testing device connections..."));
@@ -230,9 +236,9 @@ void setup() {
 
         // enable Arduino interrupt detection
         Serial.print(F("Enabling interrupt detection (Arduino external interrupt "));
-        Serial.print(digitalPinToInterrupt(GYRO_INTERRUPT_PIN));
+        Serial.print(digitalPinToInterrupt(gyroInterruptPin));
         Serial.println(F(")..."));
-        attachInterrupt(digitalPinToInterrupt(GYRO_INTERRUPT_PIN), dmpDataReady, RISING);
+        attachInterrupt(digitalPinToInterrupt(gyroInterruptPin), dmpDataReady, RISING);
         mpuIntStatus = mpu.getIntStatus();
 
         // set our DMP Ready flag so the main loop() function knows it's okay to use it
@@ -408,6 +414,7 @@ void magnet_detect_forward()//This function is called whenever a magnet/interrup
     magnetHits = 1;
   }else{
     magnetHits++;
+    // divide millis() - timeold_forward by 4 for new magnet
     rpm = 60000L/((millis() - timeold));
   }
 
