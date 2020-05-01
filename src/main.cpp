@@ -74,9 +74,9 @@ const int hallPin = 5; //not interruptable
 volatile byte magnetHits;
 
 
-unsigned long timeold;
-// unsigned long timeold_back;
-// unsigned long timeold_forward;
+unsigned long lastMagnetDetect;
+// unsigned long lastMagnetDetect_back;
+// unsigned long lastMagnetDetect_forward;
 
 // void magnet_detect_back();
 void magnet_detect_forward();
@@ -104,12 +104,12 @@ int nitroStatus;
 int fireStatus;
 
 unsigned long timeout;  // timeout variable used in loop
-unsigned long forwardLastSent;  // Used to monitor which buttons to press.
-unsigned long backwardLastSent;
-unsigned long leftLastSent;
-unsigned long rightLastSent;
-unsigned long nitroLastSent;
-unsigned long fireLastSent;
+// unsigned long forwardLastSent;  // Used to monitor which buttons to press.
+// unsigned long backwardLastSent;
+// unsigned long leftLastSent;
+// unsigned long rightLastSent;
+// unsigned long nitroLastSent;
+// unsigned long fireLastSent;
 unsigned long buttonDebounce;
 
 bool leftPressed;
@@ -125,7 +125,7 @@ unsigned long buttonPressedLast;
 
 // slow down the serial output
 unsigned long debounce;
-unsigned long lastSent;
+unsigned long lastMPUSend;
 
 
 // ================================================================
@@ -147,7 +147,7 @@ void setup() {
 
   rpm = 0;
   magnetHits = 0;
-  // timeold = 0;
+  // lastMagnetDetect = 0;
   direction = forward;
   lastDirection = backward;
 
@@ -159,12 +159,12 @@ void setup() {
   // attachInterrupt(digitalPinToInterrupt(backMagnetPin), magnet_detect_back, RISING);//Initialize the interrupt pin (Arduino digital pin 2)
   attachInterrupt(digitalPinToInterrupt(forwardMagnetPin), magnet_detect_forward, RISING);//Initialize the interrupt pin (Arduino digital pin 2)
 
-  forwardLastSent = 0;
-  backwardLastSent = 0;
-  leftLastSent = 0;
-  rightLastSent = 0;
-  nitroLastSent = 0;
-  fireLastSent = 0;
+  // forwardLastSent = 0;
+  // backwardLastSent = 0;
+  // leftLastSent = 0;
+  // rightLastSent = 0;
+  // nitroLastSent = 0;
+  // fireLastSent = 0;
 
   leftPressed = false;
   rightPressed = false;
@@ -209,10 +209,12 @@ void setup() {
     Serial.println(mpu.testConnection() ? F("MPU6050 connection successful") : F("MPU6050 connection failed"));
 
     // wait for ready
-    Serial.println(F("\nSend any character to begin DMP programming and demo: "));
-    while (Serial.available() && Serial.read()); // empty buffer
-    while (!Serial.available());                 // wait for data
-    while (Serial.available() && Serial.read()); // empty buffer again
+    // Serial.println(F("\nPress any key to begin DMP programming and demo: "));
+    // while (Serial.available() && Serial.read()); // empty buffer
+    // while (!Serial.available());                 // wait for data
+    // while (Serial.available() && Serial.read()); // empty buffer again
+
+    //while (digitalRead(firstButtonPin) == HIGH);
 
     // load and configure the DMP
     Serial.println(F("Initializing DMP..."));
@@ -263,8 +265,8 @@ void setup() {
 
 void mpu_loop() {
 
-  if ((millis() - lastSent) > debounce) { //slow this down and don't overload the buffer..
-    lastSent = millis();
+  if ((millis() - lastMPUSend) > debounce) { //slow this down and don't overload the buffer..
+    lastMPUSend = millis();
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
     // read a packet from FIFO
@@ -333,9 +335,7 @@ void hall_loop(){
   if(millis() - lastHallSend > debounce){ //Change speed every quarter second
 
     if(direction == forward){
-      Serial.print(millis());
-      Serial.print(" ");
-      Serial.print(timeold);
+      Serial.print(millis()-lastMagnetDetect);
       Serial.print(" ");
       Serial.print("FORWARDS:");
       Serial.print(rpm);
@@ -359,7 +359,7 @@ void hall_loop(){
     if(direction == backward){
       Serial.print(millis());
       Serial.print(" ");
-      Serial.print(timeold);
+      Serial.print(lastMagnetDetect);
       Serial.print(" ");
       Serial.print("BACKWARDS:");
       Serial.print(rpm);
@@ -382,7 +382,7 @@ void hall_loop(){
 
   }
 
-  if(millis() - (timeold) > 3000){ //timeout if no pedalling. TODO - Make this more granular
+  if(millis() - (lastMagnetDetect) > 3000){ //timeout if no pedalling. TODO - Make this more granular
     rpm = 0;
   }
 
@@ -414,11 +414,11 @@ void magnet_detect_forward()//This function is called whenever a magnet/interrup
     magnetHits = 1;
   }else{
     magnetHits++;
-    // divide millis() - timeold_forward by 4 for new magnet
-    rpm = 60000L/((millis() - timeold));
+    // divide millis() - lastMagnetDetect_forward by 4 for new magnet
+    rpm = 60000L/((millis() - lastMagnetDetect));
   }
 
-  timeold = millis();
+  lastMagnetDetect = millis();
   lastDirection = direction;
 
 }
